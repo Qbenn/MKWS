@@ -1,81 +1,87 @@
-# Metody numeryczne w modelowaniu spalania mieszanki metan–powietrze
+# Numerical Methods for Modeling Methane–Air Combustion
 
-Projekt na przedmiot **Metody Komputerowe w Spalaniu (MKWS)**, Politechnika
-Warszawska, Wydział Mechaniczny Energetyki i Lotnictwa.
+Project for the course **Computational Methods in Combustion (MKWS)**, Warsaw
+University of Technology, Faculty of Power and Aeronautical Engineering.
 
-Samodzielna implementacja trzech klas metod numerycznych zastosowanych do
-modelowania spalania metanu (CH₄). Celowo zrezygnowano z gotowych pakietów
-kinetycznych (np. Cantera), aby od podstaw zaimplementować i zweryfikować same
-metody numeryczne.
+A from-scratch implementation of three classes of numerical methods applied to
+the modeling of methane (CH₄) combustion. Ready-made kinetics packages
+(e.g. Cantera) were deliberately avoided in order to implement and verify the
+numerical methods themselves.
 
-## Zakres projektu
+## Scope
 
-| Część | Zagadnienie | Metoda numeryczna |
-|-------|-------------|-------------------|
-| 1 | Adiabatyczna temperatura płomienia *T*<sub>ad</sub>(φ) | Newton–Raphson (równanie nieliniowe) |
-| 2 | Zapłon w reaktorze 0D, *T*(*t*), *Y*(*t*), wykres Arrheniusa | Runge–Kutta 4. rzędu (układ ODE) |
-| 3 | Profil płomienia laminarnego 1D | różnice skończone + Newton + algorytm Thomasa (PDE) |
+| Part | Problem | Numerical method |
+|------|---------|------------------|
+| 1 | Adiabatic flame temperature *T*<sub>ad</sub>(φ) | Newton–Raphson (nonlinear equation) |
+| 2 | Ignition in a 0D reactor, *T*(*t*), *Y*(*t*), Arrhenius plot | 4th-order Runge–Kutta (ODE system) |
+| 3 | 1D laminar flame profile | finite differences + Newton + Thomas algorithm (PDE) |
 
-## Struktura plików
+## File structure
 
 ```
 projekt_spalanie_mkws/
-├── thermo.py          # dane NASA, własności mieszaniny, stechiometria
-├── flame_temp.py      # T_ad metodą Newtona–Raphsona
-├── reactor0d.py       # reaktor 0D, kinetyka Arrheniusa, całkowanie RK4
-├── flame1d.py         # płomień laminarny 1D, różnice skończone, algorytm Thomasa
-├── main.py            # uruchamia wszystkie części i generuje wykresy
-├── figures/           # wygenerowane wykresy (PNG) używane w raporcie
-├── raport.tex         # źródło raportu LaTeX
-├── raport.pdf         # skompilowany raport
-├── requirements.txt   # zależności Pythona
+├── thermo.py          # NASA data, mixture properties, stoichiometry
+├── flame_temp.py      # T_ad via Newton–Raphson
+├── reactor0d.py       # 0D reactor, Arrhenius kinetics, RK4 integration
+├── flame1d.py         # 1D laminar flame, finite differences, Thomas algorithm
+├── main.py            # runs all parts and generates the figures
+├── figures/           # generated figures (PNG) used in the report
+├── raport.tex         # LaTeX report source
+├── raport.pdf         # compiled report
+├── requirements.txt   # Python dependencies
 └── README.md
 ```
 
-## Wymagania
+## Requirements
 
 - Python 3.8+
-- biblioteki wymienione w `requirements.txt` (NumPy, Matplotlib)
-- do kompilacji raportu: dystrybucja LaTeX z pakietem `babel-polish`
-  (np. TeX Live) lub konto na Overleaf
+- libraries listed in `requirements.txt` (NumPy, Matplotlib)
+- to compile the report: a LaTeX distribution with the `babel-polish` package
+  (e.g. TeX Live) or an Overleaf account
 
-## Uruchomienie
+## Usage
 
-### Część obliczeniowa
+### Computational part
 
 ```bash
 pip install -r requirements.txt
 python3 main.py
 ```
 
-Skrypt wykona wszystkie trzy części i zapisze wykresy do katalogu `figures/`.
-W konsoli wypisane zostaną kluczowe wyniki, m.in. *T*<sub>ad</sub>, czas zapłonu
-oraz grubość płomienia.
+The script runs all three parts and saves the figures to the `figures/`
+directory. Key results are printed to the console, including *T*<sub>ad</sub>,
+the ignition delay, and the flame thickness.
 
-### Kompilacja raportu
+### Compiling the report
 
 ```bash
 pdflatex raport.tex
 pdflatex raport.tex
 ```
 
-(dwukrotnie — za drugim razem generowany jest spis treści). Alternatywnie można
-wgrać `raport.tex` wraz z katalogiem `figures/` na Overleaf.
+(run twice — the table of contents is generated on the second pass).
+Alternatively, upload `raport.tex` together with the `figures/` directory to
+Overleaf.
 
-## Główne wyniki
+## Main results
 
-- **Część 1:** *T*<sub>ad</sub> ≈ 2326 K dla mieszanki stechiometrycznej (φ = 1);
-  metoda Newtona zbiega kwadratowo w 3–4 iteracjach.
-- **Część 2:** odtworzono charakterystyczny przebieg samozapłonu oraz zależność
-  typu Arrheniusa czasu zapłonu od temperatury (pozorna energia aktywacji
-  ≈ 175 kJ/mol).
-- **Część 3:** gładki profil temperatury z wyraźną strefą reakcji; wykazano
-  zbieżność siatkową rozwiązania.
+- **Part 1:** *T*<sub>ad</sub> ≈ 2326 K for the stoichiometric mixture (φ = 1);
+  the Newton method converges quadratically in 3–4 iterations.
+- **Part 2:** the characteristic autoignition behavior was reproduced, along
+  with the Arrhenius-type dependence of the ignition delay on temperature
+  (apparent activation energy ≈ 175 kJ/mol).
+- **Part 3:** a smooth temperature profile with a well-defined reaction zone;
+  grid convergence of the solution was demonstrated.
 
-## Ograniczenia modelu
+## Model limitations
 
-Zastosowano jednokrokową kinetykę globalną i pominięto dysocjację produktów, co
-zawyża temperatury końcowe względem wartości pomiarowych. Naturalnym kierunkiem
-rozszerzenia jest użycie wieloetapowego mechanizmu reakcji (np. GRI-Mech 3.0),
-adaptacyjnego kroku czasowego dla sztywnego układu kinetycznego oraz wyznaczanie
-laminarnej prędkości spalania *S*<sub>u</sub> jako zagadnienia własnego.
+A single-step global kinetics model was used and product dissociation was
+neglected, which overestimates the final temperatures relative to measured
+values. Natural extensions include using a multi-step reaction mechanism
+(e.g. GRI-Mech 3.0), an adaptive time step for the stiff kinetic system, and
+determining the laminar burning velocity *S*<sub>u</sub> as an eigenvalue
+problem.
+
+> **Note.** The report (`raport.tex` / `raport.pdf`) is written in Polish, as
+> required by the course. The source code, comments, and this README are in
+> English.
