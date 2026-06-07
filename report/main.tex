@@ -1,1 +1,414 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[provide=*,main=polish]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, citecolor=blue!50!black,
+            urlcolor=blue!50!black}
+
+% --- listingi Python ---
+\definecolor{codegray}{gray}{0.95}
+\definecolor{kw}{rgb}{0.6,0.1,0.5}
+\definecolor{cmt}{rgb}{0.3,0.5,0.3}
+\definecolor{str}{rgb}{0.7,0.3,0.1}
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  backgroundcolor=\color{codegray},
+  frame=single, rulecolor=\color{gray!40},
+  breaklines=true, numbers=left, numberstyle=\tiny\color{gray},
+  showstringspaces=false, tabsize=4, captionpos=b
+}
+
+\begin{document}
+
+%======================================================================
+% STRONA TYTULOWA
+%======================================================================
+\begin{center}
+  {\LARGE\bfseries Metody numeryczne w modelowaniu spalania:\\[4pt]
+  temperatura adiabatyczna, kinetyka zapłonu\\ oraz płomień laminarny
+  mieszanki metan--powietrze\par}
+  \vspace{1.4cm}
+  {\large Jakub Piotrowski\par}
+  \vspace{0.6cm}
+  {\normalsize Politechnika Warszawska\\
+  Wydział Mechaniczny Energetyki i Lotnictwa\par}
+  \vspace{0.4cm}
+  {\normalsize Przedmiot: Metody Komputerowe w Spalaniu (MKWS)\\
+  Prowadzący: dr inż. Mateusz Żbikowski\par}
+  \vspace{0.4cm}
+  {\normalsize \the\year\par}
+\end{center}
+\vspace{0.8cm}
+
+%======================================================================
+% ABSTRACT
+%======================================================================
+\begin{center}\textbf{Streszczenie}\end{center}
+\begin{quotation}
+\noindent
+W~pracy przedstawiono studium obliczeniowe trzech podstawowych zagadnień
+modelowania spalania mieszanki metan--powietrze, rozwiązanych przy użyciu
+samodzielnie zaimplementowanych metod numerycznych. Wyznaczono adiabatyczną
+temperaturę płomienia metodą Newtona--Raphsona, opierając się na
+7-współczynnikowych wielomianach NASA; dla mieszanki stechiometrycznej uzyskano
+$T_{ad}\approx 2326$~K przy zbieżności kwadratowej osiąganej w~3--4 iteracjach.
+Przeanalizowano proces zapłonu w~homogenicznym reaktorze 0D, całkując układ
+równań kinetyki Arrheniusa jawną metodą Rungego--Kutty 4.~rzędu; odtworzono
+charakterystyczny przebieg samozapłonu oraz typu Arrheniusa zależność czasu
+zapłonu od~temperatury początkowej, $\tau_{ign}\propto\exp(E_a/RT)$, z~pozorną
+energią aktywacji $\approx$175~kJ/mol. Wyznaczono również stacjonarny profil
+temperatury w~laminarnym płomieniu premixowanym 1D, dyskretyzując równanie
+reakcji--dyfuzji metodą różnic skończonych i~rozwiązując powstały układ
+nieliniowy iteracją Newtona z~trójdiagonalnym algorytmem Thomasa. Wykazano
+zbieżność siatkową rozwiązania. Praca ilustruje trzy klasy metod numerycznych
+(rozwiązywanie równań nieliniowych, całkowanie ODE oraz dyskretyzację PDE)
+na~wspólnym przykładzie fizycznym.
+\end{quotation}
+
+\tableofcontents
+\newpage
+
+%======================================================================
+\section{Wstęp}
+Spalanie jest procesem, w~którym silnie sprzęgają się kinetyka chemiczna,
+transport ciepła i~masy oraz bilans energii. Pełny opis matematyczny prowadzi
+do~układów nieliniowych równań różniczkowych, których rozwiązanie analityczne
+zwykle nie istnieje. Z~tego powodu metody numeryczne stanowią podstawowe
+narzędzie współczesnej analizy procesów spalania --- od~projektowania komór
+spalania, przez ocenę emisji zanieczyszczeń, po~przewidywanie granic stabilności
+płomienia.
+
+Celem niniejszej pracy nie jest użycie gotowego pakietu kinetycznego, lecz
+\emph{samodzielna implementacja} reprezentatywnych metod numerycznych i~ich
+zastosowanie do~trzech wzajemnie uzupełniających się zagadnień modelowania
+spalania metanu:
+\begin{enumerate}
+  \item wyznaczenia adiabatycznej temperatury płomienia jako problemu
+        rozwiązywania równania nieliniowego (metoda Newtona--Raphsona),
+  \item analizy zapłonu w~reaktorze 0D jako problemu całkowania układu równań
+        różniczkowych zwyczajnych (metoda Rungego--Kutty 4.~rzędu),
+  \item wyznaczenia profilu płomienia laminarnego 1D jako problemu
+        dyskretyzacji równania różniczkowego cząstkowego (metoda różnic
+        skończonych z~iteracją Newtona).
+\end{enumerate}
+Jako paliwo przyjęto metan (CH$_4$), główny składnik gazu ziemnego, opisany
+reakcją globalną spalania zupełnego:
+\begin{equation}
+  \mathrm{CH_4} + 2\,(\mathrm{O_2} + 3{,}76\,\mathrm{N_2})
+  \;\longrightarrow\; \mathrm{CO_2} + 2\,\mathrm{H_2O} + 7{,}52\,\mathrm{N_2}.
+  \label{eq:global}
+\end{equation}
+Nacisk położono na~poprawność numeryczną metod (zbieżność, stabilność) oraz
+fizyczną interpretację uzyskanych wyników.
+
+%======================================================================
+\section{Przegląd literatury}
+
+\subsection{Termochemia i adiabatyczna temperatura płomienia}
+Adiabatyczna temperatura płomienia jest podstawową wielkością charakteryzującą
+mieszankę palną i~stanowi górne oszacowanie temperatury osiąganej w~procesie
+spalania bez wymiany ciepła z~otoczeniem. Jej wyznaczenie wymaga znajomości
+zależności ciepła właściwego i~entalpii składników od~temperatury. Powszechnie
+stosowanym standardem są~7-współczynnikowe wielomiany NASA~\cite{nasa}, dające
+spójny opis własności termodynamicznych w~szerokim zakresie temperatur. Klasyczne
+ujęcie bilansu entalpii i~metody jego rozwiązania przedstawiają monografie
+Turnsa~\cite{turns} oraz Lawa~\cite{law}.
+
+\subsection{Kinetyka chemiczna i zapłon}
+Czas opóźnienia zapłonu (ignition delay), zdefiniowany jako czas od~warunków
+początkowych do~gwałtownego wydzielenia ciepła, jest fundamentalnym parametrem
+reaktywności paliwa. Podlega on~zależności typu Arrheniusa:
+\begin{equation}
+  \tau_{ign} \propto \exp\!\left(\frac{E_a}{R T}\right),
+  \label{eq:arrhenius}
+\end{equation}
+gdzie $E_a$ to~globalna energia aktywacji. Szczegółowe mechanizmy reakcji, takie
+jak GRI-Mech~3.0~\cite{grimech}, obejmują dziesiątki gatunków i~setki reakcji
+elementarnych. W~zastosowaniach dydaktycznych i~przy ograniczonych zasobach
+obliczeniowych powszechnie stosuje się jednak \emph{jednokrokowe} modele globalne,
+których parametry kinetyczne dla węglowodorów stabelaryzowali Westbrook
+i~Dryer~\cite{westbrook}. Modele takie poprawnie odtwarzają jakościowe trendy
+(zależność od~temperatury, ciśnienia i~składu), kosztem dokładności ilościowej
+i~pominięcia chemii pośredniej.
+
+\subsection{Płomień laminarny i metody dyskretyzacji}
+Struktura jednowymiarowego płomienia premixowanego wynika z~równowagi między
+dyfuzyjnym transportem ciepła a~jego wydzielaniem w~strefie reakcji. Stacjonarny
+profil temperatury opisuje równanie reakcji--dyfuzji, którego rozwiązanie
+numeryczne wymaga dyskretyzacji przestrzennej. Metoda różnic skończonych prowadzi
+do~układu algebraicznego o~macierzy trójdiagonalnej, efektywnie rozwiązywanego
+algorytmem Thomasa~\cite{press}. Asymptotyczną teorię płomienia przy dużej energii
+aktywacji (na~której opiera się przyjęty model źródła reakcji) rozwinęli m.in.
+Williams~\cite{williams} oraz Law~\cite{law}.
+
+%======================================================================
+\section{Model obliczeniowy}
+
+\subsection{Oprogramowanie}
+Wszystkie obliczenia wykonano w~języku Python~3 z~bibliotekami \texttt{NumPy}
+(operacje wektorowe, algebra liniowa) oraz \texttt{Matplotlib} (wizualizacja).
+Świadomie zrezygnowano z~gotowych pakietów kinetycznych (np.~Cantera), aby
+samodzielnie zaimplementować i~zweryfikować metody numeryczne. Kod podzielono
+na~moduły odpowiadające poszczególnym zagadnieniom (zob.~Dodatek~\ref{app:kod}).
+
+\subsection{Model termodynamiczny}
+Ciepło właściwe oraz entalpię każdego składnika opisano wielomianami NASA:
+\begin{align}
+  \frac{c_p(T)}{R} &= a_1 + a_2 T + a_3 T^2 + a_4 T^3 + a_5 T^4,
+  \label{eq:cp}\\
+  \frac{h(T)}{R T} &= a_1 + \tfrac{a_2}{2} T + \tfrac{a_3}{3} T^2
+                      + \tfrac{a_4}{4} T^3 + \tfrac{a_5}{5} T^4 + \frac{a_6}{T},
+  \label{eq:h}
+\end{align}
+gdzie $R=8{,}314\ \mathrm{J/(mol\,K)}$, a~wyraz $a_6$ uwzględnia entalpię
+tworzenia. Współczynniki dobierane są~osobno dla zakresów $200$--$1000$~K
+oraz $1000$--$3500$~K.
+
+\subsection{Model kinetyczny}
+W~analizie zapłonu zastosowano jednokrokową kinetykę globalną reakcji~\eqref{eq:global}
+o~szybkości w~postaci Arrheniusa:
+\begin{equation}
+  \omega = A\,\exp\!\left(-\frac{E_a}{R T}\right)
+           [\mathrm{CH_4}]^{a}\,[\mathrm{O_2}]^{b},
+  \label{eq:rate}
+\end{equation}
+z~parametrami przyjętymi wg~modelu jednokrokowego Westbrooka--Dryera~\cite{westbrook}
+($E_a\approx 2{,}03\cdot10^5$~J/mol). Reaktor 0D potraktowano jako homogeniczny,
+adiabatyczny, o~stałym ciśnieniu.
+
+\subsection{Model płomienia 1D}
+Profil płomienia opisano w~zmiennej bezwymiarowej
+$\theta=(T-T_u)/(T_b-T_u)\in[0,1]$, gdzie indeksy $u$ i~$b$ oznaczają świeżą
+mieszankę i~spaliny. Źródło reakcji wyrażono przez liczbę Zeldovicha $\beta$
+w~ramach przybliżenia dużej energii aktywacji.
+
+%======================================================================
+\section{Wyniki i dyskusja}
+
+\subsection{Adiabatyczna temperatura płomienia}
+\label{sec:tad}
+Dla spalania pod stałym ciśnieniem bez wymiany ciepła entalpia jest~zachowana,
+$H_{\text{reag}}(T_{in})=H_{\text{prod}}(T_{ad})$. Definiując funkcję residualną
+\begin{equation}
+  f(T) = \sum_{i\in\text{prod}} n_i\, h_i(T) - H_{\text{reag}}(T_{in}) = 0,
+  \label{eq:resid}
+\end{equation}
+poszukiwaną temperaturę wyznaczono metodą Newtona--Raphsona. Kluczowa
+obserwacja: pochodna funkcji residualnej jest~pojemnością cieplną produktów,
+$f'(T)=\sum_i n_i c_{p,i}(T)=C_p^{\text{prod}}(T)$, co~prowadzi do~schematu
+\begin{equation}
+  T_{k+1} = T_k - \frac{f(T_k)}{C_p^{\text{prod}}(T_k)}.
+  \label{eq:newton}
+\end{equation}
+
+\begin{lstlisting}[caption={Rdzeń metody Newtona dla $T_{ad}$ (\texttt{flame\_temp.py}).}]
+for k in range(max_iter):
+    f  = H_mixture(products, T) - H_react
+    df = Cp_mixture(products, T)        # f'(T) = Cp_prod(T)
+    if abs(f) < tol * max(1.0, abs(H_react)):
+        break
+    T = T - f / df
+\end{lstlisting}
+
+Dla mieszanki stechiometrycznej ($\phi=1$) uzyskano $T_{ad}\approx 2326$~K
+(Rys.~\ref{fig:part1}, lewy panel). Wartość ta~przewyższa pomiarową
+($\sim$2225~K) o~ok.~4\%, co~jest spodziewanym skutkiem pominięcia dysocjacji
+produktów w~wysokich temperaturach w~modelu spalania zupełnego. Metoda Newtona
+wykazuje zbieżność kwadratową, osiągając tolerancję $10^{-6}$ w~zaledwie 3--4
+iteracjach (Rys.~\ref{fig:part1}, prawy panel) --- bezpośredni skutek użycia
+analitycznej, fizycznie umotywowanej pochodnej.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/part1_Tad.png}
+  \caption{Adiabatyczna temperatura płomienia w~funkcji współczynnika
+  równoważności $\phi$ (lewo) oraz kwadratowa zbieżność metody Newtona dla
+  $\phi=1$ w~skali logarytmicznej (prawo).}
+  \label{fig:part1}
+\end{figure}
+
+\subsection{Kinetyka zapłonu w reaktorze 0D}
+\label{sec:0d}
+Homogeniczny reaktor adiabatyczny opisano układem równań różniczkowych:
+\begin{align}
+  \frac{dY_{\mathrm{CH_4}}}{dt} &= -\frac{M_{\mathrm{CH_4}}}{\rho}\,\omega, &
+  \frac{dT}{dt} &= \frac{-\Delta H_r}{\rho\, c_p}\,\omega,
+  \label{eq:ode}
+\end{align}
+ze~źródłem~\eqref{eq:rate}. Układ całkowano jawną metodą Rungego--Kutty
+4.~rzędu o~stałym kroku:
+\begin{align}
+  k_1 &= f(t_n,\,y_n), &
+  k_2 &= f(t_n+\tfrac{\Delta t}{2},\,y_n+\tfrac{\Delta t}{2}k_1),\\
+  k_3 &= f(t_n+\tfrac{\Delta t}{2},\,y_n+\tfrac{\Delta t}{2}k_2), &
+  k_4 &= f(t_n+\Delta t,\,y_n+\Delta t\,k_3),\\
+  y_{n+1} &= y_n + \tfrac{\Delta t}{6}(k_1+2k_2+2k_3+k_4), & &
+\end{align}
+o~lokalnym błędzie $O(\Delta t^5)$ i~globalnym $O(\Delta t^4)$.
+
+Symulacja odtwarza charakterystyczny przebieg samozapłonu
+(Rys.~\ref{fig:ignition}): po~okresie indukcji następuje gwałtowny wzrost
+temperatury i~niemal natychmiastowe zużycie reagentów. Czas zapłonu
+$\tau_{ign}$ zdefiniowano jako moment maksimum gradientu $dT/dt$; dla
+$T_{init}=1300$~K wynosi on~$\tau_{ign}=18{,}3$~ms.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/part2_ignition.png}
+  \caption{Przebieg zapłonu mieszanki stechiometrycznej dla $T_{init}=1300$~K:
+  temperatura (lewo) oraz ułamki masowe paliwa i~utleniacza (prawo).}
+  \label{fig:ignition}
+\end{figure}
+
+Zależność opóźnienia zapłonu od~temperatury początkowej ma~charakter Arrheniusa
+zgodny z~równaniem~\eqref{eq:arrhenius}: w~układzie $\ln\tau_{ign}$ względem
+$1000/T$ punkty układają się liniowo (Rys.~\ref{fig:arrhenius}). Pozorna energia
+aktywacji wyznaczona z~nachylenia dopasowania wynosi $\approx$175~kJ/mol, co~jest
+wartością rzędu wielkości zgodną z~danymi literaturowymi dla węglowodorów.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.62\textwidth]{figures/part2_arrhenius.png}
+  \caption{Wykres Arrheniusa --- opóźnienie zapłonu w~funkcji $1000/T_{init}$.
+  Liniowość w~skali półlogarytmicznej potwierdza dominację członu Arrheniusa.}
+  \label{fig:arrhenius}
+\end{figure}
+
+\subsection{Profil płomienia laminarnego 1D}
+\label{sec:1d}
+W~układzie odniesienia związanym z~frontem płomienia stacjonarny bilans energii
+przyjmuje postać równania reakcji--dyfuzji:
+\begin{equation}
+  S_u\,\frac{d\theta}{dx}
+  = \alpha\,\frac{d^2\theta}{dx^2} + \omega(\theta),
+  \label{eq:flame}
+\end{equation}
+gdzie $S_u$ to~laminarna prędkość spalania, a~$\alpha$ --- dyfuzyjność cieplna.
+Pochodne zastąpiono ilorazami różnicowymi: drugą pochodną schematem centralnym,
+a~człon konwekcyjny schematem ,,pod prąd'' (upwind):
+\begin{equation}
+  \frac{d^2\theta}{dx^2}\bigg|_i \approx
+    \frac{\theta_{i+1}-2\theta_i+\theta_{i-1}}{\Delta x^2},
+  \qquad
+  \frac{d\theta}{dx}\bigg|_i \approx \frac{\theta_i-\theta_{i-1}}{\Delta x}.
+\end{equation}
+Powstały nieliniowy układ algebraiczny rozwiązano iteracją Newtona; macierz
+Jakobianu jest~trójdiagonalna, więc każdy krok realizowano algorytmem Thomasa
+w~czasie $O(N)$. Przyjęto warunki brzegowe Dirichleta: $\theta(0)=0$ (świeża
+mieszanka) oraz $\theta(L)=1$ (spaliny).
+
+\begin{lstlisting}[caption={Algorytm Thomasa dla układu trójdiagonalnego (\texttt{flame1d.py}).}]
+def thomas(a, b, c, d):
+    n = len(b)
+    cp = np.zeros(n); dp = np.zeros(n)
+    cp[0] = c[0]/b[0]; dp[0] = d[0]/b[0]
+    for i in range(1, n):
+        m = b[i] - a[i]*cp[i-1]
+        cp[i] = c[i]/m
+        dp[i] = (d[i] - a[i]*dp[i-1])/m
+    x = np.zeros(n); x[-1] = dp[-1]
+    for i in range(n-2, -1, -1):
+        x[i] = dp[i] - cp[i]*x[i+1]
+    return x
+\end{lstlisting}
+
+Otrzymano gładki profil temperatury z~wyraźną, zlokalizowaną strefą reakcji
+(Rys.~\ref{fig:flame1d}). Iteracja Newtona zbiega w~4 krokach. Grubość płomienia,
+zdefiniowaną jako $\delta=(T_b-T_u)/\max|dT/dx|$, zbadano w~funkcji gęstości
+siatki (Rys.~\ref{fig:grid}): wartość stabilizuje się dla $N\gtrsim 200$ węzłów,
+co~potwierdza zbieżność przyjętej dyskretyzacji.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/part3_flame1d.png}
+  \caption{Profil temperatury (lewo) i~jego gradient (prawo) w~laminarnym
+  płomieniu premixowanym 1D.}
+  \label{fig:flame1d}
+\end{figure}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.62\textwidth]{figures/part3_grid.png}
+  \caption{Badanie zbieżności siatkowej: grubość płomienia $\delta$ w~funkcji
+  liczby węzłów $N$.}
+  \label{fig:grid}
+\end{figure}
+
+%======================================================================
+\section{Wnioski}
+W~pracy zaimplementowano i~zweryfikowano trzy uzupełniające się modele numeryczne
+spalania metanu, pokrywające kluczowe techniki przedmiotu. Najważniejsze wnioski:
+\begin{enumerate}
+  \item \textbf{Metoda Newtona--Raphsona} zastosowana do~bilansu entalpii zbiega
+        kwadratowo (3--4 iteracje) dzięki analitycznej pochodnej równej pojemności
+        cieplnej produktów; uzyskano $T_{ad}\approx 2326$~K dla mieszanki
+        stechiometrycznej, co~jest zgodne z~modelem spalania zupełnego bez
+        dysocjacji.
+  \item \textbf{Metoda Rungego--Kutty 4.~rzędu} stabilnie całkuje układ kinetyki
+        zapłonu; odtworzono okres indukcji, gwałtowny samozapłon oraz zależność
+        typu Arrheniusa czasu zapłonu od~temperatury ($E_a^{\text{poz}}\approx$175~kJ/mol).
+  \item \textbf{Metoda różnic skończonych} z~iteracją Newtona i~algorytmem Thomasa
+        efektywnie rozwiązuje równanie reakcji--dyfuzji płomienia 1D; wykazano
+        zbieżność siatkową rozwiązania.
+\end{enumerate}
+Głównym ograniczeniem modelu jest~jednokrokowa kinetyka oraz pominięcie dysocjacji
+produktów, co~zawyża temperatury końcowe. Naturalnym kierunkiem rozszerzenia jest
+zastosowanie wieloetapowego mechanizmu reakcji (np.~GRI-Mech~3.0), adaptacyjnego
+kroku czasowego dla sztywnego układu kinetycznego oraz wyznaczanie laminarnej
+prędkości spalania $S_u$ jako zagadnienia własnego, zamiast zadawania jej
+a~priori.
+
+%======================================================================
+\appendix
+\section{Struktura kodu}
+\label{app:kod}
+Implementację podzielono na~moduły:
+\begin{itemize}
+  \item \texttt{thermo.py} --- dane NASA, własności mieszaniny, stechiometria
+        reakcji~\eqref{eq:global},
+  \item \texttt{flame\_temp.py} --- adiabatyczna temperatura płomienia metodą
+        Newtona (sekcja~\ref{sec:tad}),
+  \item \texttt{reactor0d.py} --- reaktor 0D, kinetyka Arrheniusa, całkowanie RK4
+        (sekcja~\ref{sec:0d}),
+  \item \texttt{flame1d.py} --- płomień laminarny 1D, różnice skończone, algorytm
+        Thomasa (sekcja~\ref{sec:1d}),
+  \item \texttt{main.py} --- uruchomienie wszystkich części i~generacja wykresów.
+\end{itemize}
+
+%======================================================================
+\begin{thebibliography}{9}
+\bibitem{nasa} B.J. McBride, S. Gordon, M.A. Reno,
+  \emph{Coefficients for Calculating Thermodynamic and Transport Properties of
+  Individual Species}, NASA Technical Memorandum 4513, 1993.
+\bibitem{turns} S.R. Turns, \emph{An Introduction to Combustion: Concepts and
+  Applications}, wyd.~3, McGraw-Hill, 2012.
+\bibitem{law} C.K. Law, \emph{Combustion Physics}, Cambridge University Press,
+  2006.
+\bibitem{grimech} G.P. Smith, D.M. Golden, M. Frenklach i~in.,
+  \emph{GRI-Mech 3.0}, 1999. \url{http://combustion.berkeley.edu/gri-mech/}
+\bibitem{westbrook} C.K. Westbrook, F.L. Dryer, ,,Simplified Reaction Mechanisms
+  for the Oxidation of Hydrocarbon Fuels in Flames'', \emph{Combustion Science
+  and Technology}, vol.~27, s.~31--43, 1981.
+\bibitem{williams} F.A. Williams, \emph{Combustion Theory}, wyd.~2,
+  Benjamin/Cummings, 1985.
+\bibitem{press} W.H. Press, S.A. Teukolsky, W.T. Vetterling, B.P. Flannery,
+  \emph{Numerical Recipes: The Art of Scientific Computing}, wyd.~3, Cambridge
+  University Press, 2007.
+\end{thebibliography}
+
+\end{document}
 
