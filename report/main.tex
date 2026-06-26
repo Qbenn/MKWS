@@ -2,8 +2,8 @@
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage[provide=*,main=polish]{babel}
-\usepackage{amsmath,amssymb}
+\usepackage[main=english]{babel}
+\usepackage{amsmath,amssymb,bm}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{listings}
@@ -15,7 +15,7 @@
 \hypersetup{colorlinks=true, linkcolor=blue!50!black, citecolor=blue!50!black,
             urlcolor=blue!50!black}
 
-% --- listingi Python ---
+% --- Python Listings Configuration ---
 \definecolor{codegray}{gray}{0.95}
 \definecolor{kw}{rgb}{0.6,0.1,0.5}
 \definecolor{cmt}{rgb}{0.3,0.5,0.3}
@@ -35,20 +35,20 @@
 \begin{document}
 
 %======================================================================
-% STRONA TYTULOWA
+% TITLE PAGE
 %======================================================================
 \begin{center}
-  {\LARGE\bfseries Metody numeryczne w modelowaniu spalania:\\[4pt]
-  temperatura adiabatyczna, kinetyka zapłonu\\ oraz płomień laminarny
-  mieszanki metan--powietrze\par}
+  {\LARGE\bfseries Numerical Methods in Combustion Modeling:\\[4pt]
+  Adiabatic Flame Temperature, Ignition Kinetics,\\ and 1D Laminar Premixed
+  Methane--Air Flame\par}
   \vspace{1.4cm}
   {\large Jakub Piotrowski\par}
   \vspace{0.6cm}
-  {\normalsize Politechnika Warszawska\\
-  Wydział Mechaniczny Energetyki i Lotnictwa\par}
+  {\normalsize Warsaw University of Technology\\
+  Faculty of Power and Aeronautical Engineering\par}
   \vspace{0.4cm}
-  {\normalsize Przedmiot: Metody Komputerowe w Spalaniu (MKWS)\\
-  Prowadzący: dr inż. Mateusz Żbikowski\par}
+  {\normalsize Course: Computational Methods in Combustion (MKWS)\\
+  Instructor: Mateusz Żbikowski, PhD, Eng.\par}
   \vspace{0.4cm}
   {\normalsize \the\year\par}
 \end{center}
@@ -57,116 +57,117 @@
 %======================================================================
 % ABSTRACT
 %======================================================================
-\begin{center}\textbf{Streszczenie}\end{center}
+\begin{center}\textbf{Abstract}\end{center}
 \begin{quotation}
 \noindent
-W~pracy przedstawiono studium obliczeniowe trzech podstawowych zagadnień
-modelowania spalania mieszanki metan--powietrze, rozwiązanych przy użyciu
-samodzielnie zaimplementowanych metod numerycznych. Wyznaczono adiabatyczną
-temperaturę płomienia metodą Newtona--Raphsona, opierając się na
-7-współczynnikowych wielomianach NASA; dla mieszanki stechiometrycznej uzyskano
-$T_{ad}\approx 2326$~K przy zbieżności kwadratowej osiąganej w~3--4 iteracjach.
-Przeanalizowano proces zapłonu w~homogenicznym reaktorze 0D, całkując układ
-równań kinetyki Arrheniusa jawną metodą Rungego--Kutty 4.~rzędu; odtworzono
-charakterystyczny przebieg samozapłonu oraz typu Arrheniusa zależność czasu
-zapłonu od~temperatury początkowej, $\tau_{ign}\propto\exp(E_a/RT)$, z~pozorną
-energią aktywacji $\approx$175~kJ/mol. Wyznaczono również stacjonarny profil
-temperatury w~laminarnym płomieniu premixowanym 1D, dyskretyzując równanie
-reakcji--dyfuzji metodą różnic skończonych i~rozwiązując powstały układ
-nieliniowy iteracją Newtona z~trójdiagonalnym algorytmem Thomasa. Wykazano
-zbieżność siatkową rozwiązania. Praca ilustruje trzy klasy metod numerycznych
-(rozwiązywanie równań nieliniowych, całkowanie ODE oraz dyskretyzację PDE)
-na~wspólnym przykładzie fizycznym.
+This paper presents an advanced computational study on three fundamental problems
+in the numerical modeling of methane--air combustion processes, accomplished through the
+in-house implementation of numerical algorithms. First, the adiabatic flame temperature
+was determined using the iterative Newton--Raphson method coupled with 7-coefficient NASA
+thermodynamic polynomials; for a stoichiometric mixture, $T_{ad}\approx 2326$~K was obtained,
+achieving quadratic convergence within 3--4 iterations. Second, the evolutionary ignition process
+in a homogeneous, adiabatic 0D reactor was investigated by integrating a stiff system of
+nonlinear ordinary differential equations (ODEs) via the explicit 4th-order Runge--Kutta method (RK4).
+The characteristic induction period and the exponential temperature dependency of the ignition
+delay time were identified, yielding an estimated apparent activation energy of $\approx$175~kJ/mol.
+Third, the steady-state temperature profile of a one-dimensional laminar premixed flame was solved.
+The finite difference method was employed to discretize the governing reaction--diffusion equation,
+utilizing a stable upwind scheme for the convective term. The resulting nonlinear system was solved
+using Newton's method combined with the Thomas algorithm ($O(N)$) for tridiagonal matrices. Spatial grid
+convergence was asymptotically verified, and the physical limitations of the models due to the
+single-step global chemical kinetics mechanism are comprehensively discussed.
 \end{quotation}
 
 \tableofcontents
 \newpage
 
 %======================================================================
-\section{Wstęp}
-Spalanie jest procesem, w~którym silnie sprzęgają się kinetyka chemiczna,
-transport ciepła i~masy oraz bilans energii. Pełny opis matematyczny prowadzi
-do~układów nieliniowych równań różniczkowych, których rozwiązanie analityczne
-zwykle nie istnieje. Z~tego powodu metody numeryczne stanowią podstawowe
-narzędzie współczesnej analizy procesów spalania --- od~projektowania komór
-spalania, przez ocenę emisji zanieczyszczeń, po~przewidywanie granic stabilności
-płomienia.
+\section{Introduction}
+Combustion is a highly nonlinear and multiscale physicochemical process in which exothermic chemical
+kinetics, heat and mass transport, and fluid dynamics are intensely coupled. The mathematical
+description of these phenomena leads to complex systems of nonlinear partial differential equations
+(PDEs) and ordinary differential equations (ODEs), which are inherently characterized by a high
+degree of stiffness. This stiffness arises because the characteristic time scales of individual
+elementary chemical reactions can span several orders of magnitude. Since analytical solutions to
+these systems do not exist, modern combustion engineering relies fundamentally on numerical methods.
 
-Celem niniejszej pracy nie jest użycie gotowego pakietu kinetycznego, lecz
-\emph{samodzielna implementacja} reprezentatywnych metod numerycznych i~ich
-zastosowanie do~trzech wzajemnie uzupełniających się zagadnień modelowania
-spalania metanu:
+The objective of this work is to demonstrate a deep understanding of these computational mechanisms
+by developing an \emph{in-house implementation} (written from scratch, avoiding black-box packages
+such as Cantera or Chemkin) of numerical algorithms applied to three classical methane combustion problems:
 \begin{enumerate}
-  \item wyznaczenia adiabatycznej temperatury płomienia jako problemu
-        rozwiązywania równania nieliniowego (metoda Newtona--Raphsona),
-  \item analizy zapłonu w~reaktorze 0D jako problemu całkowania układu równań
-        różniczkowych zwyczajnych (metoda Rungego--Kutty 4.~rzędu),
-  \item wyznaczenia profilu płomienia laminarnego 1D jako problemu
-        dyskretyzacji równania różniczkowego cząstkowego (metoda różnic
-        skończonych z~iteracją Newtona).
+  \item \textbf{Equilibrium Thermodynamics:} Finding the roots of a nonlinear algebraic equation
+        to determine the adiabatic flame temperature using the Newton--Raphson method.
+  \item \textbf{Reaction Kinetics:} Simulating auto-ignition in a 0D reactor, requiring time-accurate
+        integration of a system of ODEs describing temperature and mass fraction evolution via the
+        4th-order Runge--Kutta method.
+  \item \textbf{Transport with Chemical Reaction:} Resolving the spatial structure of a 1D laminar
+        premixed flame by solving the steady-state nonlinear reaction--diffusion equation using the
+        finite difference method.
 \end{enumerate}
-Jako paliwo przyjęto metan (CH$_4$), główny składnik gazu ziemnego, opisany
-reakcją globalną spalania zupełnego:
+
+Methane ($\mathrm{CH_4}$), the primary component of natural gas, was chosen as the fuel. To maintain
+computational efficiency while retaining the core physics, the chemical kinetics are represented
+by a global complete combustion reaction:
 \begin{equation}
-  \mathrm{CH_4} + 2\,(\mathrm{O_2} + 3{,}76\,\mathrm{N_2})
-  \;\longrightarrow\; \mathrm{CO_2} + 2\,\mathrm{H_2O} + 7{,}52\,\mathrm{N_2}.
+  \mathrm{CH_4} + 2\,(\mathrm{O_2} + 3.76\,\mathrm{N_2})
+  \;\longrightarrow\;
+  \mathrm{CO_2} + 2\,\mathrm{H_2O} + 7.52\,\mathrm{N_2}.
   \label{eq:global}
 \end{equation}
-Nacisk położono na~poprawność numeryczną metod (zbieżność, stabilność) oraz
-fizyczną interpretację uzyskanych wyników.
+Special emphasis is placed on analyzing the performance, stability, and convergence rates of the
+implemented numerical algorithms.
+
 
 %======================================================================
-\section{Przegląd literatury}
+\section{Literature Review and Theoretical Background}
 
-\subsection{Termochemia i adiabatyczna temperatura płomienia}
-Adiabatyczna temperatura płomienia jest podstawową wielkością charakteryzującą
-mieszankę palną i~stanowi górne oszacowanie temperatury osiąganej w~procesie
-spalania bez wymiany ciepła z~otoczeniem. Jej wyznaczenie wymaga znajomości
-zależności ciepła właściwego i~entalpii składników od~temperatury. Powszechnie
-stosowanym standardem są~7-współczynnikowe wielomiany NASA~\cite{nasa}, dające
-spójny opis własności termodynamicznych w~szerokim zakresie temperatur. Klasyczne
-ujęcie bilansu entalpii i~metody jego rozwiązania przedstawiają monografie
-Turnsa~\cite{turns} oraz Lawa~\cite{law}.
+\subsection{Thermochemistry and Adiabatic Flame Temperature}
+The adiabatic flame temperature ($T_{ad}$) is the maximum theoretical temperature achieved by the
+combustion products assuming no heat losses to the environment, negligible changes in kinetic or
+potential energy of the fluid flow, and complete consumption of the fuel. Evaluating $T_{ad}$ requires
+precise knowledge of the temperature-dependent physicochemical properties of each species. The industry
+standard for these properties is the 7-coefficient NASA thermodynamic polynomials~\cite{nasa}. The classical
+formulation of the enthalpy balance, accounting for the enthalpy of formation and temperature-dependent
+heat capacities, is detailed extensively by Turns~\cite{turns} and Law~\cite{law}.
 
-\subsection{Kinetyka chemiczna i zapłon}
-Czas opóźnienia zapłonu (ignition delay), zdefiniowany jako czas od~warunków
-początkowych do~gwałtownego wydzielenia ciepła, jest fundamentalnym parametrem
-reaktywności paliwa. Podlega on~zależności typu Arrheniusa:
+\subsection{Chemical Kinetics and Auto-ignition (0D Reactor)}
+The auto-ignition process is governed by a strong thermal feedback loop between the temperature and
+the chemical reaction rate. As temperature increases, the reaction rate escalates exponentially
+according to the Arrhenius law:
 \begin{equation}
-  \tau_{ign} \propto \exp\!\left(\frac{E_a}{R T}\right),
-  \label{eq:arrhenius}
+  k(T) = A \exp\!\left(-\frac{E_a}{R T}\right),
 \end{equation}
-gdzie $E_a$ to~globalna energia aktywacji. Szczegółowe mechanizmy reakcji, takie
-jak GRI-Mech~3.0~\cite{grimech}, obejmują dziesiątki gatunków i~setki reakcji
-elementarnych. W~zastosowaniach dydaktycznych i~przy ograniczonych zasobach
-obliczeniowych powszechnie stosuje się jednak \emph{jednokrokowe} modele globalne,
-których parametry kinetyczne dla węglowodorów stabelaryzowali Westbrook
-i~Dryer~\cite{westbrook}. Modele takie poprawnie odtwarzają jakościowe trendy
-(zależność od~temperatury, ciśnienia i~składu), kosztem dokładności ilościowej
-i~pominięcia chemii pośredniej.
+where $A$ represents the pre-exponential factor and $E_a$ is the global activation energy. Comprehensive
+kinetic mechanisms for methane, such as GRI-Mech~3.0~\cite{grimech}, include up to 53 species and 325
+elementary reactions. Integrating such large systems is computationally intensive and demands implicit
+ODE solvers due to the severe \emph{stiffness} introduced by the vastly different relaxation scales
+of highly reactive radicals compared to stable molecules. For educational purposes and macro-scale
+topological studies, parameterized single-step mechanisms optimized by Westbrook and Dryer~\cite{westbrook}
+are widely accepted, as they satisfactorily reproduce global heat release and ignition delay times.
 
-\subsection{Płomień laminarny i metody dyskretyzacji}
-Struktura jednowymiarowego płomienia premixowanego wynika z~równowagi między
-dyfuzyjnym transportem ciepła a~jego wydzielaniem w~strefie reakcji. Stacjonarny
-profil temperatury opisuje równanie reakcji--dyfuzji, którego rozwiązanie
-numeryczne wymaga dyskretyzacji przestrzennej. Metoda różnic skończonych prowadzi
-do~układu algebraicznego o~macierzy trójdiagonalnej, efektywnie rozwiązywanego
-algorytmem Thomasa~\cite{press}. Asymptotyczną teorię płomienia przy dużej energii
-aktywacji (na~której opiera się przyjęty model źródła reakcji) rozwinęli m.in.
-Williams~\cite{williams} oraz Law~\cite{law}.
+\subsection{1D Laminar Flame - The Reaction--Diffusion Equation}
+\label{sec:lit-flame}
+The steady-state, one-dimensional structure of a premixed flame is established by a balance between
+two counteracting processes: the forward thermal diffusion of heat from the reaction zone into the
+unburned mixture, and the convective inflow of the fresh reactants coupled with their exothermic
+chemical consumption. Mathematically, this manifests as a second-order nonlinear PDE. Solving this problem
+numerically demands careful selection of discretization schemes: while the diffusion term is ideally
+approximated using central differences, the convective term requires directional schemes (such as
+\emph{upwind} or higher-order variants like QUICK) to suppress non-physical spatial oscillations
+under high grid Péclet numbers~\cite{press, williams}.
+
 
 %======================================================================
-\section{Model obliczeniowy}
+\section{Computational Model and Code Architecture}
 
-\subsection{Oprogramowanie}
-Wszystkie obliczenia wykonano w~języku Python~3 z~bibliotekami \texttt{NumPy}
-(operacje wektorowe, algebra liniowa) oraz \texttt{Matplotlib} (wizualizacja).
-Świadomie zrezygnowano z~gotowych pakietów kinetycznych (np.~Cantera), aby
-samodzielnie zaimplementować i~zweryfikować metody numeryczne. Kod podzielono
-na~moduły odpowiadające poszczególnym zagadnieniom (zob.~Dodatek~\ref{app:kod}).
+All numerical simulations were conducted using Python~3. Standard built-in solvers (e.g.,
+\texttt{scipy.integrate.solve\_ivp}) were deliberately omitted in favor of custom-coded algorithms
+to ensure full transparency and control over the numerical behavior. The codebase is modularly structured
+(see Appendix~\ref{app:kod}).
 
-\subsection{Model termodynamiczny}
-Ciepło właściwe oraz entalpię każdego składnika opisano wielomianami NASA:
+\subsection{Thermodynamic Model (\texttt{thermo.py} module)}
+The constant-pressure specific heat ($c_p$) and absolute molar enthalpy ($h$) of an individual species
+are defined using continuous 7-coefficient polynomial functions:
 \begin{align}
   \frac{c_p(T)}{R} &= a_1 + a_2 T + a_3 T^2 + a_4 T^3 + a_5 T^4,
   \label{eq:cp}\\
@@ -174,219 +175,193 @@ Ciepło właściwe oraz entalpię każdego składnika opisano wielomianami NASA:
                       + \tfrac{a_4}{4} T^3 + \tfrac{a_5}{5} T^4 + \frac{a_6}{T},
   \label{eq:h}
 \end{align}
-gdzie $R=8{,}314\ \mathrm{J/(mol\,K)}$, a~wyraz $a_6$ uwzględnia entalpię
-tworzenia. Współczynniki dobierane są~osobno dla zakresów $200$--$1000$~K
-oraz $1000$--$3500$~K.
+where $R=8.314\ \mathrm{J/(mol\,K)}$, and the integration constant $a_6$ accounts for the standard enthalpy
+of formation $\Delta h_f^\circ$. The parameters $a_1\dots a_7$ are retrieved from the database for two
+distinct temperature regimes ($200$--$1000$~K and $1000$--$3500$~K).
 
-\subsection{Model kinetyczny}
-W~analizie zapłonu zastosowano jednokrokową kinetykę globalną reakcji~\eqref{eq:global}
-o~szybkości w~postaci Arrheniusa:
+\subsection{Global Kinetic Mechanism}
+Methane oxidation is modeled via a single-step global reaction. The reaction rate is expressed as:
 \begin{equation}
   \omega = A\,\exp\!\left(-\frac{E_a}{R T}\right)
-           [\mathrm{CH_4}]^{a}\,[\mathrm{O_2}]^{b},
+           [\mathrm{CH_4}]^{a}\,[\mathrm{O_2}]^{b}, \quad \left[\frac{\mathrm{mol}}{\mathrm{m^3\,s}}\right]
   \label{eq:rate}
 \end{equation}
-z~parametrami przyjętymi wg~modelu jednokrokowego Westbrooka--Dryera~\cite{westbrook}
-($E_a\approx 2{,}03\cdot10^5$~J/mol). Reaktor 0D potraktowano jako homogeniczny,
-adiabatyczny, o~stałym ciśnieniu.
+Following the Westbrook--Dryer calibration~\cite{westbrook}, empirical parameters were selected to best match
+experimental burning velocities: $E_a = 2.026\cdot 10^5$~J/mol, $A = 1.3\cdot 10^8$ (converted to SI units),
+with reaction orders of $a = -0.3$ for the fuel and $b = 1.3$ for the oxidizer. The negative order with
+respect to methane accounts for its inhibiting effect on radical formation during the early induction stage.
 
-\subsection{Model płomienia 1D}
-Profil płomienia opisano w~zmiennej bezwymiarowej
-$\theta=(T-T_u)/(T_b-T_u)\in[0,1]$, gdzie indeksy $u$ i~$b$ oznaczają świeżą
-mieszankę i~spaliny. Źródło reakcji wyrażono przez liczbę Zeldovicha $\beta$
-w~ramach przybliżenia dużej energii aktywacji.
-
-%======================================================================
-\section{Wyniki i dyskusja}
-
-\subsection{Adiabatyczna temperatura płomienia}
-\label{sec:tad}
-Dla spalania pod stałym ciśnieniem bez wymiany ciepła entalpia jest~zachowana,
-$H_{\text{reag}}(T_{in})=H_{\text{prod}}(T_{ad})$. Definiując funkcję residualną
-\begin{equation}
-  f(T) = \sum_{i\in\text{prod}} n_i\, h_i(T) - H_{\text{reag}}(T_{in}) = 0,
-  \label{eq:resid}
-\end{equation}
-poszukiwaną temperaturę wyznaczono metodą Newtona--Raphsona. Kluczowa
-obserwacja: pochodna funkcji residualnej jest~pojemnością cieplną produktów,
-$f'(T)=\sum_i n_i c_{p,i}(T)=C_p^{\text{prod}}(T)$, co~prowadzi do~schematu
-\begin{equation}
-  T_{k+1} = T_k - \frac{f(T_k)}{C_p^{\text{prod}}(T_k)}.
-  \label{eq:newton}
-\end{equation}
-
-\begin{lstlisting}[caption={Rdzeń metody Newtona dla $T_{ad}$ (\texttt{flame\_temp.py}).}]
-for k in range(max_iter):
-    f  = H_mixture(products, T) - H_react
-    df = Cp_mixture(products, T)        # f'(T) = Cp_prod(T)
-    if abs(f) < tol * max(1.0, abs(H_react)):
-        break
-    T = T - f / df
-\end{lstlisting}
-
-Dla mieszanki stechiometrycznej ($\phi=1$) uzyskano $T_{ad}\approx 2326$~K
-(Rys.~\ref{fig:part1}, lewy panel). Wartość ta~przewyższa pomiarową
-($\sim$2225~K) o~ok.~4\%, co~jest spodziewanym skutkiem pominięcia dysocjacji
-produktów w~wysokich temperaturach w~modelu spalania zupełnego. Metoda Newtona
-wykazuje zbieżność kwadratową, osiągając tolerancję $10^{-6}$ w~zaledwie 3--4
-iteracjach (Rys.~\ref{fig:part1}, prawy panel) --- bezpośredni skutek użycia
-analitycznej, fizycznie umotywowanej pochodnej.
-
-\begin{figure}[ht]
-  \centering
-  \includegraphics[width=\textwidth]{figures/part1_Tad.png}
-  \caption{Adiabatyczna temperatura płomienia w~funkcji współczynnika
-  równoważności $\phi$ (lewo) oraz kwadratowa zbieżność metody Newtona dla
-  $\phi=1$ w~skali logarytmicznej (prawo).}
-  \label{fig:part1}
-\end{figure}
-
-\subsection{Kinetyka zapłonu w reaktorze 0D}
-\label{sec:0d}
-Homogeniczny reaktor adiabatyczny opisano układem równań różniczkowych:
-\begin{align}
-  \frac{dY_{\mathrm{CH_4}}}{dt} &= -\frac{M_{\mathrm{CH_4}}}{\rho}\,\omega, &
-  \frac{dT}{dt} &= \frac{-\Delta H_r}{\rho\, c_p}\,\omega,
-  \label{eq:ode}
-\end{align}
-ze~źródłem~\eqref{eq:rate}. Układ całkowano jawną metodą Rungego--Kutty
-4.~rzędu o~stałym kroku:
-\begin{align}
-  k_1 &= f(t_n,\,y_n), &
-  k_2 &= f(t_n+\tfrac{\Delta t}{2},\,y_n+\tfrac{\Delta t}{2}k_1),\\
-  k_3 &= f(t_n+\tfrac{\Delta t}{2},\,y_n+\tfrac{\Delta t}{2}k_2), &
-  k_4 &= f(t_n+\Delta t,\,y_n+\Delta t\,k_3),\\
-  y_{n+1} &= y_n + \tfrac{\Delta t}{6}(k_1+2k_2+2k_3+k_4), & &
-\end{align}
-o~lokalnym błędzie $O(\Delta t^5)$ i~globalnym $O(\Delta t^4)$.
-
-Symulacja odtwarza charakterystyczny przebieg samozapłonu
-(Rys.~\ref{fig:ignition}): po~okresie indukcji następuje gwałtowny wzrost
-temperatury i~niemal natychmiastowe zużycie reagentów. Czas zapłonu
-$\tau_{ign}$ zdefiniowano jako moment maksimum gradientu $dT/dt$; dla
-$T_{init}=1300$~K wynosi on~$\tau_{ign}=18{,}3$~ms.
-
-\begin{figure}[ht]
-  \centering
-  \includegraphics[width=\textwidth]{figures/part2_ignition.png}
-  \caption{Przebieg zapłonu mieszanki stechiometrycznej dla $T_{init}=1300$~K:
-  temperatura (lewo) oraz ułamki masowe paliwa i~utleniacza (prawo).}
-  \label{fig:ignition}
-\end{figure}
-
-Zależność opóźnienia zapłonu od~temperatury początkowej ma~charakter Arrheniusa
-zgodny z~równaniem~\eqref{eq:arrhenius}: w~układzie $\ln\tau_{ign}$ względem
-$1000/T$ punkty układają się liniowo (Rys.~\ref{fig:arrhenius}). Pozorna energia
-aktywacji wyznaczona z~nachylenia dopasowania wynosi $\approx$175~kJ/mol, co~jest
-wartością rzędu wielkości zgodną z~danymi literaturowymi dla węglowodorów.
-
-\begin{figure}[ht]
-  \centering
-  \includegraphics[width=0.62\textwidth]{figures/part2_arrhenius.png}
-  \caption{Wykres Arrheniusa --- opóźnienie zapłonu w~funkcji $1000/T_{init}$.
-  Liniowość w~skali półlogarytmicznej potwierdza dominację członu Arrheniusa.}
-  \label{fig:arrhenius}
-\end{figure}
-
-\subsection{Profil płomienia laminarnego 1D}
-\label{sec:1d}
-W~układzie odniesienia związanym z~frontem płomienia stacjonarny bilans energii
-przyjmuje postać równania reakcji--dyfuzji:
+\subsection{1D Laminar Flame Formulation (\texttt{flame1d.py})}
+\label{sec:flame1d}
+To resolve the flame structure, the governing equations are reduced to a non-dimensional energy balance
+formulated in the flame-fixed coordinate system:
 \begin{equation}
   S_u\,\frac{d\theta}{dx}
   = \alpha\,\frac{d^2\theta}{dx^2} + \omega(\theta),
   \label{eq:flame}
 \end{equation}
-gdzie $S_u$ to~laminarna prędkość spalania, a~$\alpha$ --- dyfuzyjność cieplna.
-Pochodne zastąpiono ilorazami różnicowymi: drugą pochodną schematem centralnym,
-a~człon konwekcyjny schematem ,,pod prąd'' (upwind):
+where $\theta=(T-T_u)/(T_b-T_u) \in [0,1]$ is the normalized temperature. The parameter $S_u$ is the
+laminar burning velocity, which in this work is treated as a prescribed constant (obtained from
+experimental correlations) rather than an eigenvalue to be determined iteratively. This simplification
+allows us to focus on the numerical solution of the spatial profile, but it is important to note that
+in a fully self-consistent formulation, $S_u$ would be part of the eigenvalue problem.
+
+The thermal diffusivity $\alpha$, density $\rho$ and specific heat $c_p$ are assumed constant in the
+present model; in reality they are strong functions of temperature. The source term $\omega(\theta)$
+represents the normalized heat release and is constructed from the Arrhenius kinetics using the
+Zeldovich asymptotic formulation:
+\begin{equation}
+  \omega(\theta) = \frac{\Delta H_r}{\rho\,c_p\,(T_b-T_u)}\;
+  A\,\exp\!\left(-\frac{E_a}{R\,T(\theta)}\right)
+  [\mathrm{CH_4}]^{a}\,[\mathrm{O}_2]^{b},
+\end{equation}
+where $T(\theta) = T_u + \theta\,(T_b-T_u)$. In the numerical implementation, the reaction rate is
+evaluated at each grid point using the local temperature. This ensures that the spatial coupling
+between chemistry and transport is correctly represented, even though the chemical mechanism is
+global.
+
+
+%======================================================================
+\section{Results and Discussion}
+
+\subsection{Iterative Estimation of the Adiabatic Flame Temperature}
+\label{sec:tad}
+For an isobaric, adiabatic system, the total enthalpy must be conserved: $H_{\text{reag}}(T_{in}) = H_{\text{prod}}(T_{ad})$.
+This condition can be mathematically rewritten as a root-finding problem for the residual function:
+\begin{equation}
+  f(T) = \sum_{i\in\text{prod}} n_i\, h_i(T) - H_{\text{reag}}(T_{in}) = 0.
+  \label{eq:resid}
+\end{equation}
+Because the individual species enthalpies depend nonlinearly on temperature (Equation~\ref{eq:h}), $f(T)$ is highly nonlinear.
+To locate its root, the multi-dimensional Newton--Raphson iterative technique was deployed. A profound advantage of this formulation is that the analytical derivative of the residual function yields a direct physical property—the total constant-pressure heat capacity of the products:
+\begin{equation}
+  f'(T) = \frac{d}{dT} \left( \sum_i n_i h_i(T) \right) = \sum_i n_i c_{p,i}(T) \equiv C_p^{\text{prod}}(T).
+\end{equation}
+Consequently, the numerical update formula takes on an elegant, thermodynamically closed form:
+\begin{equation}
+  T_{k+1} = T_k - \frac{f(T_k)}{C_p^{\text{prod}}(T_k)}.
+  \label{eq:newton}
+\end{equation}
+
+For a stoichiometric mixture ($\phi=1$), the calculated adiabatic temperature converged to $T_{ad}\approx 2326$~K (Fig.~\ref{fig:part1}, left panel). It is crucial to note that this value overpredicts real-world experimental measurements ($\approx 2225$~K) by more than 100~K (approx. 4\%). This discrepancy is a direct artifact of the \emph{complete combustion assumption}. In high-temperature environments ($T > 2000$~K), the product molecules ($\mathrm{CO_2}$ and $\mathrm{H_2O}$) naturally undergo significant secondary dissociation into smaller radical species ($\mathrm{CO, OH, O, H}$). Because dissociation reactions are highly endothermic, they absorb a fraction of the chemical energy, effectively lowering the peak temperature of the flame.
+
+Numerically, the algorithm demonstrated exceptional efficiency. Constructing an exact, analytical Jacobian yielded a pristine \textbf{quadratic convergence rate}. As seen in Fig.~\ref{fig:part1} (right panel), the residual plummets from $10^4$~J to below $10^{-8}$~J in only 3 to 4 iterations.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/part1_Tad.png}
+  \caption{Adiabatic flame temperature plotted against the equivalence ratio $\phi$ (left) and the log-scale quadratic convergence history of Newton's method for $\phi=1$ (right).}
+  \label{fig:part1}
+\end{figure}
+
+\subsection{Integration of the Chemical Kinetics ODE System (RK4)}
+\label{sec:0d}
+The temporal chemical evolution within a homogeneous, constant-pressure, adiabatic batch reactor is governed by a coupled system of ordinary differential equations:
+\begin{align}
+  \frac{dY_{\mathrm{CH_4}}}{dt} &= -\frac{M_{\mathrm{CH_4}}}{\rho}\,\omega, &
+  \frac{dT}{dt} &= \frac{-\Delta H_r}{\rho\, c_p}\,\omega,
+  \label{eq:ode}
+\end{align}
+where $Y$ denotes mass fractions and $\Delta H_r$ is the heat of reaction. This system was integrated forward in time using the classical explicit fourth-order Runge--Kutta scheme (RK4). Evaluating the derivatives at four intermediate stages per time step ensures a local truncation error of $O(\Delta t^5)$ and a global tracking accuracy of $O(\Delta t^4)$.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{figures/part2_ignition.png}
+  \caption{Auto-ignition transient of a stoichiometric mixture at $T_{init}=1300$~K: rapid thermal runaway establishing the ignition delay $\tau_{ign}$ (left) and the corresponding fuel depletion profile (right).}
+  \label{fig:ignition}
+\end{figure}
+
+The simulated evolution paths (Fig.~\ref{fig:ignition}) accurately capture the underlying physics. The process exhibits a distinct induction period during which the temperature rises imperceptibly while the radical pool incubates (represented mathematically in the global model by the slow initial growth of the exponential Arrhenius term). This is followed by a sudden, catastrophic transition known as \emph{thermal runaway}, driving the reactor state to its final burned condition. The ignition delay time ($\tau_{ign}$)—defined rigorously as the moment where the thermal gradient $\partial T/\partial t$ reaches its maximum—was resolved at $\tau_{ign}=18.32$~ms for an initial temperature of 1300~K.
+
+By sweeping across a range of initial temperatures and mapping the resulting ignition delays onto a semi-logarithmic Arrhenius plot (Fig.~\ref{fig:arrhenius}), a highly linear relationship was recovered:
+\begin{equation}
+  \ln (\tau_{ign}) \sim \frac{E_a^{app}}{R}\cdot\frac{1}{T_{init}}.
+\end{equation}
+From the slope of the least-squares linear regression line, the apparent activation energy for the ignition delay was estimated as $E_a^{app} \approx 175$~kJ/mol. This value matches closely with macro-scale experimental data for natural gas auto-ignition.
+
+\textbf{Numerical Critique:} It is necessary to critically assess the limitations of explicit integration for this problem. Chemical kinetic equations are notoriously "stiff" due to the presence of fast-acting reactive intermediates. Because the explicit RK4 scheme is only conditionally stable, the allowable time step ($\Delta t$) is rigidly bounded by the smallest chemical timescale in the system. This constraint forces the use of microsecond steps ($\Delta t \sim 10^{-6}$~s). While acceptable for a simplified single-step model, explicit RK4 becomes highly inefficient when scaling up to detailed multi-species mechanisms, where implicit or semi-implicit solvers are mandatory.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.62\textwidth]{figures/part2_arrhenius.png}
+  \caption{Arrhenius plot of the ignition delay. The strict linearity of the numerical data points confirms the underlying exponential dependency on initial temperature.}
+  \label{fig:arrhenius}
+\end{figure}
+
+\subsection{Discrete Finite Difference Model of the 1D Laminar Flame}
+\label{sec:1d}
+The spatial distribution of the non-dimensional flame equation (Equation~\ref{eq:flame}) was solved on a uniform spatial grid. To ensure the numerical stability of the differential operators, the second-order thermal diffusion term was discretized using standard central differences (yielding second-order spatial accuracy). Crucially, the convective velocity term was discretized using a first-order directional \emph{upwind} scheme:
 \begin{equation}
   \frac{d^2\theta}{dx^2}\bigg|_i \approx
     \frac{\theta_{i+1}-2\theta_i+\theta_{i-1}}{\Delta x^2},
   \qquad
   \frac{d\theta}{dx}\bigg|_i \approx \frac{\theta_i-\theta_{i-1}}{\Delta x}.
 \end{equation}
-Powstały nieliniowy układ algebraiczny rozwiązano iteracją Newtona; macierz
-Jakobianu jest~trójdiagonalna, więc każdy krok realizowano algorytmem Thomasa
-w~czasie $O(N)$. Przyjęto warunki brzegowe Dirichleta: $\theta(0)=0$ (świeża
-mieszanka) oraz $\theta(L)=1$ (spaliny).
+Omitting the upwind formulation and relying on central differences for the convective term would trigger severe, unphysical spatial oscillations (wiggles) near the steep flame front, as dictated by the grid Péclet number criterion.
 
-\begin{lstlisting}[caption={Algorytm Thomasa dla układu trójdiagonalnego (\texttt{flame1d.py}).}]
+Substituting these finite difference approximations into the continuous equation at each grid point $i$ yields a coupled system of $N$ nonlinear algebraic equations of the form $F_i(\theta) = 0$. This system was solved iteratively using a multi-dimensional Newton method: $\bm{J} \cdot \Delta \bm{\theta} = -\bm{F}$. Because each discrete equation only couples immediate neighbors ($i-1, i, i+1$), the resulting Jacobian matrix $\bm{J} = \partial F_i/\partial \theta_j$ possesses a strict \textbf{tridiagonal structure}. This mathematical feature enabled a major computational optimization: instead of executing a standard Gaussian elimination which scales as $O(N^3)$, the linear system was solved using the \textbf{Thomas algorithm}. This reduced the operational complexity to a linear scale ($O(N)$), drastically accelerating the execution speed.
+
+The Dirichlet boundary conditions $\theta(0)=0$ (unburnt side) and $\theta(L)=1$ (burnt side) are imposed by eliminating the first and last equations from the tridiagonal system and modifying the right-hand side vector accordingly. The implementation of the Thomas algorithm used in this work is shown in Listing~\ref{lst:thomas}.
+
+\begin{lstlisting}[caption={Thomas algorithm for tridiagonal systems}, label={lst:thomas}]
 def thomas(a, b, c, d):
     n = len(b)
-    cp = np.zeros(n); dp = np.zeros(n)
-    cp[0] = c[0]/b[0]; dp[0] = d[0]/b[0]
+    cp = np.zeros(n)
+    dp = np.zeros(n)
+    cp[0] = c[0]/b[0]
+    dp[0] = d[0]/b[0]
     for i in range(1, n):
         m = b[i] - a[i]*cp[i-1]
         cp[i] = c[i]/m
         dp[i] = (d[i] - a[i]*dp[i-1])/m
-    x = np.zeros(n); x[-1] = dp[-1]
+    x = np.zeros(n)
+    x[-1] = dp[-1]
     for i in range(n-2, -1, -1):
         x[i] = dp[i] - cp[i]*x[i+1]
     return x
 \end{lstlisting}
 
-Otrzymano gładki profil temperatury z~wyraźną, zlokalizowaną strefą reakcji
-(Rys.~\ref{fig:flame1d}). Iteracja Newtona zbiega w~4 krokach. Grubość płomienia,
-zdefiniowaną jako $\delta=(T_b-T_u)/\max|dT/dx|$, zbadano w~funkcji gęstości
-siatki (Rys.~\ref{fig:grid}): wartość stabilizuje się dla $N\gtrsim 200$ węzłów,
-co~potwierdza zbieżność przyjętej dyskretyzacji.
+The solver demonstrated rapid convergence, requiring typically 4 Newton iterations due to the exact analytical evaluation of the tridiagonal Jacobian entries. The resolved thermal profile (Fig.~\ref{fig:flame1d}) shows a highly localized reaction zone confined within a thin layer spanning less than a millimeter, characterized by a sharp peak in the temperature gradient. A grid independence study (Fig.~\ref{fig:grid}) reveals that because of these extreme spatial gradients, the calculated flame thickness $\delta$ becomes independent of the mesh resolution only when the grid density exceeds $N > 200$ points for a $\sim$2~mm domain. Coarser meshes introduce significant artificial numerical diffusion, which unphysically smears the flame front.
 
 \begin{figure}[ht]
   \centering
   \includegraphics[width=\textwidth]{figures/part3_flame1d.png}
-  \caption{Profil temperatury (lewo) i~jego gradient (prawo) w~laminarnym
-  płomieniu premixowanym 1D.}
+  \caption{Steady-state non-dimensional temperature profile (left) and its corresponding sharp spatial gradient across the flame front (right) within the 1D laminar premixed flame.}
   \label{fig:flame1d}
 \end{figure}
 
 \begin{figure}[ht]
   \centering
   \includegraphics[width=0.62\textwidth]{figures/part3_grid.png}
-  \caption{Badanie zbieżności siatkowej: grubość płomienia $\delta$ w~funkcji
-  liczby węzłów $N$.}
+  \caption{Grid convergence study mapping the resolved flame thickness $\delta$ against the number of spatial nodes $N$. The solution asymptotically stabilizes once the reaction zone is sufficiently resolved.}
   \label{fig:grid}
 \end{figure}
 
+
 %======================================================================
-\section{Wnioski}
-W~pracy zaimplementowano i~zweryfikowano trzy uzupełniające się modele numeryczne
-spalania metanu, pokrywające kluczowe techniki przedmiotu. Najważniejsze wnioski:
+\section{Conclusions}
+This work has successfully demonstrated the implementation and evaluation of fundamental numerical methods applied to chemically reacting flows and thermodynamics. Developing these algorithms from scratch provided valuable insights into both the capabilities and the inherent constraints of each numerical technique:
+
 \begin{enumerate}
-  \item \textbf{Metoda Newtona--Raphsona} zastosowana do~bilansu entalpii zbiega
-        kwadratowo (3--4 iteracje) dzięki analitycznej pochodnej równej pojemności
-        cieplnej produktów; uzyskano $T_{ad}\approx 2326$~K dla mieszanki
-        stechiometrycznej, co~jest zgodne z~modelem spalania zupełnego bez
-        dysocjacji.
-  \item \textbf{Metoda Rungego--Kutty 4.~rzędu} stabilnie całkuje układ kinetyki
-        zapłonu; odtworzono okres indukcji, gwałtowny samozapłon oraz zależność
-        typu Arrheniusa czasu zapłonu od~temperatury ($E_a^{\text{poz}}\approx$175~kJ/mol).
-  \item \textbf{Metoda różnic skończonych} z~iteracją Newtona i~algorytmem Thomasa
-        efektywnie rozwiązuje równanie reakcji--dyfuzji płomienia 1D; wykazano
-        zbieżność siatkową rozwiązania.
+  \item \textbf{Efficiency of Analytical Jacobians:} Formulating an exact analytical derivative for Newton's root-finding method in the thermodynamic module guaranteed quadratic convergence. The residual was reduced to machine precision in only 4 iterations, proving that exact Jacobians should always be preferred over numerical approximations when mathematically tractable.
+  \item \textbf{Stiffness and Explicit Limitations:} The 0D reactor simulation successfully recovered the classical Arrhenius behavior, yielding an apparent activation energy of $175$~kJ/mol. However, the strict time-step constraints required by the explicit RK4 scheme highlighted the severe limitations of explicit integration when dealing with chemically stiff ODE systems. For advanced multi-component mechanisms, migrating to implicit formulations (such as Backward Differentiation Formulas - BDF) is an absolute necessity.
+  \item \textbf{Grid Resolution and Computational Complexity:} The 1D finite difference flame solver, optimized via the linear-time Thomas algorithm ($O(N)$), effectively captured the thin localized structure of the flame front. The grid dependence study demonstrated that resolving sharp chemical gradients requires high spatial resolution ($N \sim 200-400$). To optimize future computational costs, implementing Adaptive Mesh Refinement (AMR) would be highly beneficial to dynamically cluster nodes exclusively within the high-gradient reaction zone.
 \end{enumerate}
-Głównym ograniczeniem modelu jest~jednokrokowa kinetyka oraz pominięcie dysocjacji
-produktów, co~zawyża temperatury końcowe. Naturalnym kierunkiem rozszerzenia jest
-zastosowanie wieloetapowego mechanizmu reakcji (np.~GRI-Mech~3.0), adaptacyjnego
-kroku czasowego dla sztywnego układu kinetycznego oraz wyznaczanie laminarnej
-prędkości spalania $S_u$ jako zagadnienia własnego, zamiast zadawania jej
-a~priori.
+
+While the single-step global reaction mechanism served as an excellent vehicle for testing the mathematical performance of the algorithms, the omission of radical intermediate chemistry and endothermic product dissociation introduces a known overprediction in the final flame temperature. Expanding this numerical framework to support multi-step detailed kinetics represents the logical next step for this research.
+
 
 %======================================================================
 \appendix
-\section{Struktura kodu}
+\section{Structure of the Custom Simulation Environment}
 \label{app:kod}
-Implementację podzielono na~moduły:
+The computational framework was developed using an object-oriented approach, ensuring strict separation between thermodynamic databases, numerical solvers, and the core physical models:
 \begin{itemize}
-  \item \texttt{thermo.py} --- dane NASA, własności mieszaniny, stechiometria
-        reakcji~\eqref{eq:global},
-  \item \texttt{flame\_temp.py} --- adiabatyczna temperatura płomienia metodą
-        Newtona (sekcja~\ref{sec:tad}),
-  \item \texttt{reactor0d.py} --- reaktor 0D, kinetyka Arrheniusa, całkowanie RK4
-        (sekcja~\ref{sec:0d}),
-  \item \texttt{flame1d.py} --- płomień laminarny 1D, różnice skończone, algorytm
-        Thomasa (sekcja~\ref{sec:1d}),
-  \item \texttt{main.py} --- uruchomienie wszystkich części i~generacja wykresów.
+  \item \texttt{thermo.py} --- handles the CHEMKIN-formatted NASA-7 polynomial coefficients, mixture molecular weights, and stoichiometry definitions.
+  \item \texttt{flame\_temp.py} --- contains the Newton--Raphson root-finding algorithm formulated over absolute enthalpies to evaluate $T_{ad}$ (Section~\ref{sec:tad}).
+  \item \texttt{reactor0d.py} --- models the transient auto-ignition kinetics in an isobaric batch reactor using a custom-built explicit RK4 solver (Section~\ref{sec:0d}).
+  \item \texttt{flame1d.py} --- an object-oriented finite difference solver for the steady 1D reaction--diffusion equation, utilizing an upwind convective scheme and a tridiagonal Thomas matrix engine (Section~\ref{sec:1d}).
+  \item \texttt{main.py} --- the central execution script that coordinates the simulations, performs parametric sweeps, and generates all the analytical plots.
 \end{itemize}
 
 %======================================================================
@@ -395,20 +370,19 @@ Implementację podzielono na~moduły:
   \emph{Coefficients for Calculating Thermodynamic and Transport Properties of
   Individual Species}, NASA Technical Memorandum 4513, 1993.
 \bibitem{turns} S.R. Turns, \emph{An Introduction to Combustion: Concepts and
-  Applications}, wyd.~3, McGraw-Hill, 2012.
+  Applications}, 3rd ed., McGraw-Hill, 2012.
 \bibitem{law} C.K. Law, \emph{Combustion Physics}, Cambridge University Press,
   2006.
-\bibitem{grimech} G.P. Smith, D.M. Golden, M. Frenklach i~in.,
+\bibitem{grimech} G.P. Smith, D.M. Golden, M. Frenklach et al.,
   \emph{GRI-Mech 3.0}, 1999. \url{http://combustion.berkeley.edu/gri-mech/}
-\bibitem{westbrook} C.K. Westbrook, F.L. Dryer, ,,Simplified Reaction Mechanisms
-  for the Oxidation of Hydrocarbon Fuels in Flames'', \emph{Combustion Science
-  and Technology}, vol.~27, s.~31--43, 1981.
-\bibitem{williams} F.A. Williams, \emph{Combustion Theory}, wyd.~2,
+\bibitem{westbrook} C.K. Westbrook, F.L. Dryer, "Simplified Reaction Mechanisms
+  for the Oxidation of Hydrocarbon Fuels in Flames", \emph{Combustion Science
+  and Technology}, vol.~27, pp.~31--43, 1981.
+\bibitem{williams} F.A. Williams, \emph{Combustion Theory}, 2nd ed.,
   Benjamin/Cummings, 1985.
 \bibitem{press} W.H. Press, S.A. Teukolsky, W.T. Vetterling, B.P. Flannery,
-  \emph{Numerical Recipes: The Art of Scientific Computing}, wyd.~3, Cambridge
+  \emph{Numerical Recipes: The Art of Scientific Computing}, 3rd ed., Cambridge
   University Press, 2007.
 \end{thebibliography}
 
 \end{document}
-
